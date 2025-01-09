@@ -1,9 +1,9 @@
 import {
-  Column,
   Entity,
+  Column,
+  PrimaryGeneratedColumn,
   ManyToOne,
   OneToMany,
-  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Group } from './group.entity';
 import { Payer } from './payer.entity';
@@ -17,24 +17,33 @@ export class Expense {
   @Column()
   description: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   totalAmount: number;
 
   @Column()
   currency: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   convertedAmount: number;
 
   @Column()
   date: Date;
 
-  @OneToMany(() => Payer, (payer) => payer.expense)
-  payers: Payer[];
-
-  @OneToMany(() => Participant, (participant) => participant.expense)
-  participants: Participant[];
-
   @ManyToOne(() => Group, (group) => group.expenses)
   group: Group;
+
+  @Column()
+  groupId: string;
+
+  @OneToMany(() => Payer, (payer) => payer.expense, {
+    cascade: true,
+    eager: true,
+  })
+  payers: Payer[];
+
+  @OneToMany(() => Participant, (participant) => participant.expense, {
+    cascade: true,
+    eager: true,
+  })
+  participants: Participant[];
 }

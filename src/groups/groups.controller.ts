@@ -6,14 +6,19 @@ import {
   Patch,
   Param,
   Delete,
+  NotFoundException,
 } from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
+import { UrlService } from 'src/services/url/url.service';
 
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(
+    private readonly groupsService: GroupsService,
+    private readonly urlService: UrlService,
+  ) {}
 
   @Post()
   create(@Body() createGroupDto: CreateGroupDto) {
@@ -26,8 +31,14 @@ export class GroupsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.groupsService.findOne(id);
+  async findOne(@Param('id') encodedId: string) {
+    try {
+      // Decode the ID before querying
+      const decodedId = this.urlService.decodeId(encodedId);
+      return await this.groupsService.findOne(decodedId);
+    } catch (error) {
+      throw new NotFoundException(`Group not found`);
+    }
   }
 
   @Patch(':id')

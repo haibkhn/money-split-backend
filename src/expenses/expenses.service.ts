@@ -16,12 +16,12 @@ export class ExpensesService {
     private expenseRepository: Repository<Expense>,
     @InjectRepository(Group)
     private groupRepository: Repository<Group>,
+    @InjectRepository(Member)
+    private memberRepository: Repository<Member>,
     @InjectRepository(Payer)
     private payerRepository: Repository<Payer>,
     @InjectRepository(Participant)
     private participantRepository: Repository<Participant>,
-    @InjectRepository(Member)
-    private memberRepository: Repository<Member>,
   ) {}
 
   async create(createExpenseDto: CreateExpenseDto) {
@@ -41,71 +41,118 @@ export class ExpensesService {
       currency: createExpenseDto.currency,
       convertedAmount: createExpenseDto.convertedAmount,
       date: createExpenseDto.date,
-      group: group,
+      group,
+      groupId: group.id,
     });
 
-    // Save the expense first to get its ID
+    // Save expense first to get ID
     const savedExpense = await this.expenseRepository.save(expense);
 
     // Create and save payers
-    if (createExpenseDto.payers?.length) {
-      const payers = createExpenseDto.payers.map((payer) =>
-        this.payerRepository.create({
-          member: group.members.find((m) => m.id === payer.memberId),
-          amount: payer.amount,
+    const payers = await Promise.all(
+      createExpenseDto.payers.map(async (payerDto) => {
+        const member = await this.memberRepository.findOne({
+          where: { id: payerDto.memberId },
+        });
+        if (!member) {
+          throw new NotFoundException(`Member not found: ${payerDto.memberId}`);
+        }
+        return this.payerRepository.create({
+          amount: payerDto.amount,
+          member,
           expense: savedExpense,
-        }),
-      );
-      savedExpense.payers = await this.payerRepository.save(payers);
-    }
+        });
+      }),
+    );
+    savedExpense.payers = await this.payerRepository.save(payers);
 
     // Create and save participants
-    if (createExpenseDto.participants?.length) {
-      const participants = createExpenseDto.participants.map((participant) =>
-        this.participantRepository.create({
-          member: group.members.find((m) => m.id === participant.memberId),
-          share: participant.share,
+    const participants = await Promise.all(
+      createExpenseDto.participants.map(async (participantDto) => {
+        const member = await this.memberRepository.findOne({
+          where: { id: participantDto.memberId },
+        });
+        if (!member) {
+          throw new NotFoundException(
+            `Member not found: ${participantDto.memberId}`,
+          );
+        }
+        return this.participantRepository.create({
+          share: participantDto.share,
+          member,
           expense: savedExpense,
-        }),
-      );
-      savedExpense.participants =
-        await this.participantRepository.save(participants);
-    }
+        });
+      }),
+    );
+    savedExpense.participants =
+      await this.participantRepository.save(participants);
 
     // Update member balances
-    await this.updateMemberBalances(savedExpense);
+    await this.updateMemberBalances(group.id);
 
-    return savedExpense;
+    // Return the complete expense with all relations
+    return this.expenseRepository.findOne({
+      where: { id: savedExpense.id },
+      relations: [
+        'payers',
+        'payers.member',
+        'participants',
+        'participants.member',
+      ],
+    });
   }
 
-  private async updateMemberBalances(expense: Expense) {
-    // Get all involved members
-    const memberIds = new Set([
-      ...expense.payers.map((p) => p.member.id),
-      ...expense.participants.map((p) => p.member.id),
-    ]);
+  private async updateMemberBalances(groupId: string) {
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: [
+        'members',
+        'expenses',
+        'expenses.payers',
+        'expenses.payers.member',
+        'expenses.participants',
+        'expenses.participants.member',
+      ],
+    });
 
-    for (const memberId of memberIds) {
-      const member = await this.memberRepository.findOne({
-        where: { id: memberId },
+    if (!group) return;
+
+    // Reset all balances to 0
+    group.members.forEach((member) => {
+      member.balance = 0;
+    });
+
+    // Recalculate balances based on all expenses
+    group.expenses.forEach((expense) => {
+      // Add paid amounts
+      expense.payers.forEach((payer) => {
+        const member = group.members.find((m) => m.id === payer.member.id);
+        if (member) {
+          // Convert to number before adding
+          member.balance = Number(member.balance || 0) + Number(payer.amount);
+        }
       });
 
-      if (member) {
-        // Calculate what they paid
-        const paid = expense.payers
-          .filter((p) => p.member.id === memberId)
-          .reduce((sum, p) => sum + p.amount, 0);
+      // Subtract shares
+      expense.participants.forEach((participant) => {
+        const member = group.members.find(
+          (m) => m.id === participant.member.id,
+        );
+        if (member) {
+          // Convert to number before subtracting
+          member.balance =
+            Number(member.balance || 0) - Number(participant.share);
+        }
+      });
+    });
 
-        // Calculate what they owe
-        const owe = expense.participants
-          .filter((p) => p.member.id === memberId)
-          .reduce((sum, p) => sum + p.share, 0);
+    // Round balances to 2 decimal places before saving
+    group.members.forEach((member) => {
+      member.balance = Number(Number(member.balance).toFixed(2));
+    });
 
-        // Update balance
-        member.balance = (member.balance || 0) + paid - owe;
-        await this.memberRepository.save(member);
-      }
-    }
+    // Save updated balances
+    await this.memberRepository.save(group.members);
   }
 
   async findAll() {
@@ -126,9 +173,9 @@ export class ExpensesService {
       relations: [
         'group',
         'payers',
-        'payers.member',
+        'payers.member', // Add this
         'participants',
-        'participants.member',
+        'participants.member', // Add this
       ],
     });
 
@@ -140,9 +187,10 @@ export class ExpensesService {
   }
 
   async findByGroup(groupId: string) {
-    return this.expenseRepository.find({
-      where: { group: { id: groupId } },
+    const expenses = await this.expenseRepository.find({
+      where: { groupId },
       relations: [
+        'group',
         'payers',
         'payers.member',
         'participants',
@@ -150,6 +198,8 @@ export class ExpensesService {
       ],
       order: { date: 'DESC' },
     });
+
+    return expenses;
   }
 
   async update(id: string, updateExpenseDto: UpdateExpenseDto) {
@@ -217,7 +267,7 @@ export class ExpensesService {
     const savedExpense = await this.expenseRepository.save(expense);
 
     // Update member balances with new expense details
-    await this.updateMemberBalances(savedExpense);
+    await this.updateMemberBalances(savedExpense.groupId);
 
     return savedExpense;
   }
@@ -246,18 +296,22 @@ export class ExpensesService {
       });
 
       if (member) {
-        // Subtract what they paid
+        // Calculate paid amount - convert to number
         const paid = expense.payers
           .filter((p) => p.member.id === memberId)
-          .reduce((sum, p) => sum + p.amount, 0);
+          .reduce((sum, p) => Number(sum) + Number(p.amount), 0);
 
-        // Add back what they owed
+        // Calculate owed amount - convert to number
         const owed = expense.participants
           .filter((p) => p.member.id === memberId)
-          .reduce((sum, p) => sum + p.share, 0);
+          .reduce((sum, p) => Number(sum) + Number(p.share), 0);
 
         // Update balance (reverse of original calculation)
-        member.balance = (member.balance || 0) - paid + owed;
+        // Ensure all operations are done with numbers
+        const currentBalance = Number(member.balance || 0);
+        const adjustedBalance = currentBalance - Number(paid) + Number(owed);
+        member.balance = Number(adjustedBalance.toFixed(2));
+
         await this.memberRepository.save(member);
       }
     }

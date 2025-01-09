@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Group } from '../entities/group.entity';
@@ -49,17 +49,41 @@ export class GroupsService {
   async findOne(id: string) {
     return this.groupRepository.findOne({
       where: { id },
-      relations: ['members', 'expenses'],
+      relations: [
+        'members',
+        'expenses',
+        'expenses.payers',
+        'expenses.participants',
+      ],
     });
   }
 
   async update(id: string, updateGroupDto: UpdateGroupDto) {
-    await this.groupRepository.update(id, updateGroupDto);
-    return this.findOne(id);
+    const group = await this.groupRepository.findOne({
+      where: { id },
+      relations: ['members'],
+    });
+
+    if (!group) {
+      throw new NotFoundException(`Group with ID "${id}" not found`);
+    }
+
+    // Update only the allowed properties
+    Object.assign(group, {
+      name: updateGroupDto.name,
+      currency: updateGroupDto.currency,
+    });
+
+    // Save the updated group
+    return this.groupRepository.save(group);
   }
 
   async remove(id: string) {
-    const group = await this.findOne(id);
+    const group = await this.groupRepository.findOne({
+      where: { id },
+      relations: ['members', 'expenses'],
+    });
+    if (!group) return null;
     return this.groupRepository.remove(group);
   }
 }

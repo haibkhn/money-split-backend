@@ -7,10 +7,10 @@ export class Participant {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   share: number;
 
-  @ManyToOne(() => Member)
+  @ManyToOne(() => Member, { eager: true }) // Add eager: true here
   member: Member;
 
   @ManyToOne(() => Expense, (expense) => expense.participants)
