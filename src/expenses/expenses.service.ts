@@ -173,9 +173,9 @@ export class ExpensesService {
       relations: [
         'group',
         'payers',
-        'payers.member', // Add this
+        'payers.member',
         'participants',
-        'participants.member', // Add this
+        'participants.member',
       ],
     });
 

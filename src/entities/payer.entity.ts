@@ -10,7 +10,7 @@ export class Payer {
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 
-  @ManyToOne(() => Member, { eager: true }) // Add eager: true here
+  @ManyToOne(() => Member, { eager: true })
   member: Member;
 
   @ManyToOne(() => Expense, (expense) => expense.payers)
