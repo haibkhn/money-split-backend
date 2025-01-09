@@ -27,68 +27,55 @@ export class ExpensesService {
   async create(createExpenseDto: CreateExpenseDto) {
     const group = await this.groupRepository.findOne({
       where: { id: createExpenseDto.groupId },
+      relations: ['members'],
     });
 
     if (!group) {
-      throw new NotFoundException(`Group not found`);
+      throw new NotFoundException('Group not found');
     }
 
-    // Create expense
+    // Create the expense
     const expense = this.expenseRepository.create({
       description: createExpenseDto.description,
       totalAmount: createExpenseDto.totalAmount,
       currency: createExpenseDto.currency,
       convertedAmount: createExpenseDto.convertedAmount,
       date: createExpenseDto.date,
-      group,
+      group: group,
     });
 
-    // Save expense first to get ID
+    // Save the expense first to get its ID
     const savedExpense = await this.expenseRepository.save(expense);
 
-    // Create payers
-    const payers = await Promise.all(
-      createExpenseDto.payers.map(async (payerDto) => {
-        const member = await this.memberRepository.findOne({
-          where: { id: payerDto.memberId },
-        });
-        if (!member) {
-          throw new NotFoundException(`Member not found`);
-        }
-        return this.payerRepository.create({
-          amount: payerDto.amount,
-          member,
+    // Create and save payers
+    if (createExpenseDto.payers?.length) {
+      const payers = createExpenseDto.payers.map((payer) =>
+        this.payerRepository.create({
+          member: group.members.find((m) => m.id === payer.memberId),
+          amount: payer.amount,
           expense: savedExpense,
-        });
-      }),
-    );
+        }),
+      );
+      savedExpense.payers = await this.payerRepository.save(payers);
+    }
 
-    // Create participants
-    const participants = await Promise.all(
-      createExpenseDto.participants.map(async (participantDto) => {
-        const member = await this.memberRepository.findOne({
-          where: { id: participantDto.memberId },
-        });
-        if (!member) {
-          throw new NotFoundException(`Member not found`);
-        }
-        return this.participantRepository.create({
-          share: participantDto.share,
-          member,
+    // Create and save participants
+    if (createExpenseDto.participants?.length) {
+      const participants = createExpenseDto.participants.map((participant) =>
+        this.participantRepository.create({
+          member: group.members.find((m) => m.id === participant.memberId),
+          share: participant.share,
           expense: savedExpense,
-        });
-      }),
-    );
-
-    // Save payers and participants
-    savedExpense.payers = await this.payerRepository.save(payers);
-    savedExpense.participants =
-      await this.participantRepository.save(participants);
+        }),
+      );
+      savedExpense.participants =
+        await this.participantRepository.save(participants);
+    }
 
     // Update member balances
     await this.updateMemberBalances(savedExpense);
 
-    return this.expenseRepository.save(savedExpense);
+    return savedExpense;
   }
 
   private async updateMemberBalances(expense: Expense) {

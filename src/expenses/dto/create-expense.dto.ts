@@ -3,7 +3,7 @@ import {
   IsNumber,
   IsDate,
   IsArray,
-  ValidateNested,
+  IsNotEmpty,
   IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -26,6 +26,7 @@ export class ParticipantDto {
 
 export class CreateExpenseDto {
   @IsString()
+  @IsNotEmpty()
   description: string;
 
   @IsNumber()
@@ -37,20 +38,21 @@ export class CreateExpenseDto {
   @IsNumber()
   convertedAmount: number;
 
-  @IsDate()
   @Type(() => Date)
+  @IsDate()
   date: Date;
+
+  @IsString()
+  splitType: string;
 
   @IsUUID()
   groupId: string;
 
   @IsArray()
-  @ValidateNested({ each: true })
   @Type(() => PayerDto)
   payers: PayerDto[];
 
   @IsArray()
-  @ValidateNested({ each: true })
   @Type(() => ParticipantDto)
   participants: ParticipantDto[];
 }
