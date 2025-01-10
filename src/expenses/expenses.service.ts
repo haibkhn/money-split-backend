@@ -48,7 +48,7 @@ export class ExpensesService {
     // Save expense first to get ID
     const savedExpense = await this.expenseRepository.save(expense);
 
-    // Create and save payers
+    // Create and save payers with convertedAmount
     const payers = await Promise.all(
       createExpenseDto.payers.map(async (payerDto) => {
         const member = await this.memberRepository.findOne({
@@ -59,6 +59,7 @@ export class ExpensesService {
         }
         return this.payerRepository.create({
           amount: payerDto.amount,
+          convertedAmount: payerDto.convertedAmount,
           member,
           expense: savedExpense,
         });
@@ -124,12 +125,12 @@ export class ExpensesService {
 
     // Recalculate balances based on all expenses
     group.expenses.forEach((expense) => {
-      // Add paid amounts
+      // Add paid amounts using converted amounts when available
       expense.payers.forEach((payer) => {
         const member = group.members.find((m) => m.id === payer.member.id);
         if (member) {
-          // Convert to number before adding
-          member.balance = Number(member.balance || 0) + Number(payer.amount);
+          const amount = Number(payer.convertedAmount || payer.amount || 0);
+          member.balance = Number(member.balance || 0) + amount;
         }
       });
 
@@ -139,7 +140,6 @@ export class ExpensesService {
           (m) => m.id === participant.member.id,
         );
         if (member) {
-          // Convert to number before subtracting
           member.balance =
             Number(member.balance || 0) - Number(participant.share);
         }
@@ -151,7 +151,6 @@ export class ExpensesService {
       member.balance = Number(Number(member.balance).toFixed(2));
     });
 
-    // Save updated balances
     await this.memberRepository.save(group.members);
   }
 

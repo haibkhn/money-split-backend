@@ -18,6 +18,10 @@ export class PayerDto {
   @IsNumber()
   @IsNotEmpty()
   amount: number;
+
+  @IsNumber()
+  @IsOptional()
+  convertedAmount?: number;
 }
 
 export class ParticipantDto {

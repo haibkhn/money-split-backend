@@ -10,6 +10,9 @@ export class Payer {
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  convertedAmount: number;
+
   @ManyToOne(() => Member, { eager: true })
   member: Member;
 
