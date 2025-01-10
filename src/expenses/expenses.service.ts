@@ -129,7 +129,11 @@ export class ExpensesService {
       expense.payers.forEach((payer) => {
         const member = group.members.find((m) => m.id === payer.member.id);
         if (member) {
-          const amount = Number(payer.convertedAmount || payer.amount || 0);
+          // Use convertedAmount when currencies differ, amount when same
+          const amount =
+            expense.currency !== group.currency
+              ? Number(payer.convertedAmount || 0)
+              : Number(payer.amount || 0);
           member.balance = Number(member.balance || 0) + amount;
         }
       });
@@ -203,6 +207,14 @@ export class ExpensesService {
 
   async update(id: string, updateExpenseDto: UpdateExpenseDto) {
     const expense = await this.findOne(id);
+    const group = await this.groupRepository.findOne({
+      where: { id: expense.groupId },
+      relations: ['members'],
+    });
+
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
 
     // First, revert the old balance changes
     await this.revertMemberBalances(expense);
@@ -231,6 +243,7 @@ export class ExpensesService {
           if (!member) throw new NotFoundException(`Member not found`);
           return this.payerRepository.create({
             amount: payerDto.amount,
+            convertedAmount: payerDto.convertedAmount, // Added this line
             member,
             expense,
           });
@@ -268,7 +281,15 @@ export class ExpensesService {
     // Update member balances with new expense details
     await this.updateMemberBalances(savedExpense.groupId);
 
-    return savedExpense;
+    return this.expenseRepository.findOne({
+      where: { id: savedExpense.id },
+      relations: [
+        'payers',
+        'payers.member',
+        'participants',
+        'participants.member',
+      ],
+    });
   }
 
   async remove(id: string) {
@@ -284,6 +305,13 @@ export class ExpensesService {
   }
 
   private async revertMemberBalances(expense: Expense) {
+    // First get the group to know its currency
+    const group = await this.groupRepository.findOne({
+      where: { id: expense.groupId },
+    });
+
+    if (!group) return;
+
     const memberIds = new Set([
       ...expense.payers.map((p) => p.member.id),
       ...expense.participants.map((p) => p.member.id),
@@ -295,18 +323,23 @@ export class ExpensesService {
       });
 
       if (member) {
-        // Calculate paid amount - convert to number
+        // Calculate paid amount
         const paid = expense.payers
           .filter((p) => p.member.id === memberId)
-          .reduce((sum, p) => Number(sum) + Number(p.amount), 0);
+          .reduce((sum, p) => {
+            const paymentAmount =
+              expense.currency !== group.currency
+                ? Number(p.convertedAmount || 0)
+                : Number(p.amount || 0);
+            return Number(sum) + paymentAmount;
+          }, 0);
 
-        // Calculate owed amount - convert to number
+        // Calculate owed amount (participant shares are already in group currency)
         const owed = expense.participants
           .filter((p) => p.member.id === memberId)
           .reduce((sum, p) => Number(sum) + Number(p.share), 0);
 
-        // Update balance (reverse of original calculation)
-        // Ensure all operations are done with numbers
+        // Update balance
         const currentBalance = Number(member.balance || 0);
         const adjustedBalance = currentBalance - Number(paid) + Number(owed);
         member.balance = Number(adjustedBalance.toFixed(2));
