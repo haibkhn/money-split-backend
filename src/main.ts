@@ -14,7 +14,8 @@ async function bootstrap() {
     origin: ['http://localhost:4200', 'https://money-split-frontend.vercel.app/'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
-  });  app.useGlobalPipes(
+  });  
+  app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
       whitelist: true,
