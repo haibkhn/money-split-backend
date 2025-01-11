@@ -13,9 +13,15 @@ export class Group {
   @Column()
   currency: string;
 
-  @OneToMany(() => Member, (member) => member.group)
+  @OneToMany(() => Member, (member) => member.group, {
+    cascade: true,
+    eager: true,
+  })
   members: Member[];
 
-  @OneToMany(() => Expense, (expense) => expense.group)
+  @OneToMany(() => Expense, (expense) => expense.group, {
+    cascade: true,
+    eager: true,
+  })
   expenses: Expense[];
 }

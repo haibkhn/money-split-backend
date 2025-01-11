@@ -9,9 +9,12 @@ export class Member {
   @Column()
   name: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
   balance: number;
 
   @ManyToOne(() => Group, (group) => group.members)
   group: Group;
+
+  @Column()
+  groupId: string;
 }

@@ -7,10 +7,13 @@ export class Payer {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 
-  @ManyToOne(() => Member)
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  convertedAmount: number;
+
+  @ManyToOne(() => Member, { eager: true })
   member: Member;
 
   @ManyToOne(() => Expense, (expense) => expense.payers)
