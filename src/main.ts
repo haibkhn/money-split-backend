@@ -10,8 +10,11 @@ async function bootstrap() {
 
   logger.log('Application is starting...');
 
-  app.enableCors();
-  app.useGlobalPipes(
+  app.enableCors({
+    origin: ['http://localhost:4200', 'https://money-split-frontend.vercel.app/'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    credentials: true,
+  });  app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
       whitelist: true,
