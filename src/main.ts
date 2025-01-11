@@ -1,9 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'], // Enable all log levels
+  });
+
+  logger.log('Application is starting...');
 
   app.enableCors();
   app.useGlobalPipes(
@@ -18,5 +23,6 @@ async function bootstrap() {
   );
 
   await app.listen(3000);
+  logger.log('Application is listening on port 3000');
 }
 bootstrap();

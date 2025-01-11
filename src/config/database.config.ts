@@ -1,13 +1,32 @@
-import { registerAs } from '@nestjs/config';
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-export default registerAs('database', () => ({
-  type: 'postgres',
-  host: process.env.DATABASE_HOST,
-  port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
-  username: process.env.DATABASE_USERNAME,
-  password: process.env.DATABASE_PASSWORD,
-  database: process.env.DATABASE_NAME,
-  entities: ['dist/**/*.entity{.ts,.js}'],
-  synchronize: process.env.NODE_ENV !== 'production', // Don't use in production!
-  logging: process.env.NODE_ENV !== 'production',
-}));
+const getDatabaseConfig = (configService: any): TypeOrmModuleOptions => {
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+      synchronize: false, // First time running the app, set this to true to create tables, then set to false
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      logging: ['error'],
+      logger: 'advanced-console',
+    };
+  }
+
+  return {
+    type: 'postgres',
+    host: configService.get('DATABASE_HOST'),
+    port: configService.get('DATABASE_PORT'),
+    username: configService.get('DATABASE_USERNAME'),
+    password: configService.get('DATABASE_PASSWORD'),
+    database: configService.get('DATABASE_NAME'),
+    entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+    synchronize: true,
+    logging: ['error'],
+    logger: 'advanced-console',
+  };
+};
+
+export default getDatabaseConfig;
