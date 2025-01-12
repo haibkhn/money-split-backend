@@ -11,10 +11,14 @@ async function bootstrap() {
   logger.log('Application is starting...');
 
   app.enableCors({
-    origin: ['http://localhost:4200', 'https://money-split-frontend.vercel.app/'],
+    origin: [
+      'http://localhost:4200',
+      'https://money-split-frontend.vercel.app'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
-  });  
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -26,6 +30,7 @@ async function bootstrap() {
     }),
   );
 
+  const port = process.env.PORT || 3000;
   await app.listen(3000);
   logger.log('Application is listening on port 3000');
 }
