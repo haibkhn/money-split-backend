@@ -24,6 +24,7 @@ export class GroupsService {
         id: createGroupDto.id,
         name: createGroupDto.name,
         currency: createGroupDto.currency,
+        shortUrl: createGroupDto.shortUrl,
         members: [],
         expenses: [],
       });

@@ -13,6 +13,9 @@ export class Group {
   @Column()
   currency: string;
 
+  @Column()
+  shortUrl: string;
+
   @OneToMany(() => Member, (member) => member.group, {
     cascade: true,
     eager: true,
