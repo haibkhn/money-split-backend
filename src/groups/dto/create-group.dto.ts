@@ -20,4 +20,8 @@ export class CreateGroupDto {
   @IsOptional()
   @IsArray()
   expenses?: any[];
+
+  @IsOptional()
+  @IsString()
+  shortUrl?: string;
 }

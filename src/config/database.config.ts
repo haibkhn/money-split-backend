@@ -6,7 +6,7 @@ const getDatabaseConfig = (configService: any): TypeOrmModuleOptions => {
       type: 'postgres',
       url: process.env.DATABASE_URL,
       entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-      synchronize: false, // First time running the app, set this to true to create tables, then set to false
+      synchronize: true, // First time running the app, set this to true to create tables, then set to false
       ssl: {
         rejectUnauthorized: false,
       },
